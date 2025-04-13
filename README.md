@@ -91,19 +91,6 @@ uv pip install -e .
 pytest
 ```
 
-## Publishing
-
-1. Create a PyPI account at https://pypi.org/account/register/
-2. Generate an API token at https://pypi.org/manage/account/token/
-3. Store your token securely (never commit it to the repository)
-4. Build and publish:
-```bash
-# Build the package
-python -m build
-
-# Upload to PyPI (you'll be prompted for your token)
-python -m twine upload dist/*
-```
 
 ## Contributing
 
