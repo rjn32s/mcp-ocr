@@ -36,9 +36,13 @@ jobs:
     
     - name: Install Tesseract (Windows)
       if: matrix.os == 'windows-latest'
+      shell: pwsh
       run: |
         choco install tesseract
-        echo "$((Get-Command tesseract).Path | Split-Path)" >> $GITHUB_PATH
+        $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine")
+        echo "C:\Program Files\Tesseract-OCR" >> $env:GITHUB_PATH
+        refreshenv
+        tesseract --version
     
     - name: Install dependencies
       run: |
