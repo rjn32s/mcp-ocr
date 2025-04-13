@@ -1,6 +1,6 @@
 [project]
 name = "mcp-ocr"
-version = "0.1.0"
+version = "0.1.1"
 description = "MCP server for OCR functionality using Tesseract"
 readme = "README.md"
 requires-python = ">=3.11"
