@@ -1,4 +1,6 @@
 # MCP OCR Server
+[![PyPI](https://img.shields.io/pypi/v/mcp-ocr)](https://pypi.org/project/mcp-ocr/)
+[![Downloads](https://static.pepy.tech/personalized-badge/mcp-ocr?period=total&units=international_system&left_color=black&right_color=orange&left_text=Downloads)](https://pepy.tech/project/mcp-ocr)
 
 A production-grade OCR server built using MCP (Model Context Protocol) that provides OCR capabilities through a simple interface.
 
