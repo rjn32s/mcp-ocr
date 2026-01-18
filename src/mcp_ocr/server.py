@@ -13,6 +13,8 @@ import urllib.parse
 from enum import Enum
 import subprocess
 import sys
+import base64
+import re
 from .install_tesseract import install_tesseract
 
 def check_tesseract():
@@ -35,10 +37,10 @@ class OCRInputType(Enum):
     BYTES = "bytes"
 
 async def load_image(input_data: Union[str, bytes]) -> np.ndarray:
-    """Load image from various sources (file path, URL, or bytes).
+    """Load image from various sources (file path, URL, base64 string, or bytes).
     
     Args:
-        input_data: Can be a file path, URL, or image bytes
+        input_data: Can be a file path, URL, base64 encoded string, or image bytes
         
     Returns:
         numpy array of the image
@@ -50,7 +52,8 @@ async def load_image(input_data: Union[str, bytes]) -> np.ndarray:
         # Determine input type
         if isinstance(input_data, str):
             # Check if it's a URL
-            if urllib.parse.urlparse(input_data).scheme in ('http', 'https'):
+            parsed_url = urllib.parse.urlparse(input_data)
+            if parsed_url.scheme in ('http', 'https'):
                 try:
                     async with httpx.AsyncClient(timeout=30.0) as client:
                         response = await client.get(input_data)
@@ -59,8 +62,8 @@ async def load_image(input_data: Union[str, bytes]) -> np.ndarray:
                 except httpx.HTTPError as e:
                     raise McpError(
                         ErrorData(
-                            INTERNAL_ERROR,
-                            f"Failed to fetch image from URL: {str(e)}"
+                            code=INTERNAL_ERROR,
+                            message=f"Failed to fetch image from URL: {str(e)}"
                         )
                     )
             # Check if it's a file path
@@ -70,17 +73,25 @@ async def load_image(input_data: Union[str, bytes]) -> np.ndarray:
                 except Exception as e:
                     raise McpError(
                         ErrorData(
-                            INTERNAL_ERROR,
-                            f"Failed to read image file: {str(e)}"
+                            code=INTERNAL_ERROR,
+                            message=f"Failed to read image file: {str(e)}"
                         )
                     )
+            # Check if it's a base64 encoded string
             else:
-                raise McpError(
-                    ErrorData(
-                        INVALID_PARAMS,
-                        f"Invalid input: {input_data} is neither a valid URL nor an existing file"
+                try:
+                    # Remove potential data URI prefix (e.g., "data:image/jpeg;base64,")
+                    base64_data = re.sub(r'^data:image/.+;base64,', '', input_data)
+                    # Attempt to decode base64
+                    image_bytes = base64.b64decode(base64_data)
+                    nparr = np.frombuffer(image_bytes, np.uint8)
+                except Exception:
+                    raise McpError(
+                        ErrorData(
+                            code=INVALID_PARAMS,
+                            message=f"Invalid input: {input_data[:50]}... is not a valid URL, file path, or base64 string"
+                        )
                     )
-                )
         else:
             # It's bytes
             nparr = np.frombuffer(input_data, np.uint8)
@@ -90,8 +101,8 @@ async def load_image(input_data: Union[str, bytes]) -> np.ndarray:
         if img is None:
             raise McpError(
                 ErrorData(
-                    INTERNAL_ERROR,
-                    "Failed to decode image data"
+                    code=INTERNAL_ERROR,
+                    message="Failed to decode image data"
                 )
             )
         return img
@@ -101,24 +112,21 @@ async def load_image(input_data: Union[str, bytes]) -> np.ndarray:
     except Exception as e:
         raise McpError(
             ErrorData(
-                INTERNAL_ERROR,
-                f"Unexpected error loading image: {str(e)}"
+                code=INTERNAL_ERROR,
+                message=f"Unexpected error loading image: {str(e)}"
             )
         )
 
 @mcp.tool()
 async def perform_ocr(
-    input_data: Union[str, bytes],
+    input_data: str,
     language: str = "eng",
     config: str = "--oem 3 --psm 6"
 ) -> str:
     """Perform OCR on the provided input.
     
     Args:
-        input_data: Can be one of:
-            - File path to an image
-            - URL to an image
-            - Raw image bytes
+        input_data: File path, URL, or base64 encoded image data
         language: Tesseract language code (default: "eng")
         config: Tesseract configuration options (default: "--oem 3 --psm 6")
         
@@ -136,8 +144,8 @@ async def perform_ocr(
         if language not in available_langs:
             raise McpError(
                 ErrorData(
-                    INVALID_PARAMS,
-                    f"Unsupported language: {language}. Available languages: {', '.join(available_langs)}"
+                    code=INVALID_PARAMS,
+                    message=f"Unsupported language: {language}. Available languages: {', '.join(available_langs)}"
                 )
             )
             
@@ -150,16 +158,16 @@ async def perform_ocr(
             if not text.strip():
                 raise McpError(
                     ErrorData(
-                        INTERNAL_ERROR,
-                        "No text detected in image"
+                        code=INTERNAL_ERROR,
+                        message="No text detected in image"
                     )
                 )
             return text.strip()
         except Exception as e:
             raise McpError(
                 ErrorData(
-                    INTERNAL_ERROR,
-                    f"OCR processing failed: {str(e)}"
+                    code=INTERNAL_ERROR,
+                    message=f"OCR processing failed: {str(e)}"
                 )
             )
             
@@ -168,8 +176,8 @@ async def perform_ocr(
     except Exception as e:
         raise McpError(
             ErrorData(
-                INTERNAL_ERROR,
-                f"Unexpected error during OCR: {str(e)}"
+                code=INTERNAL_ERROR,
+                message=f"Unexpected error during OCR: {str(e)}"
             )
         )
 
@@ -188,16 +196,16 @@ async def get_supported_languages() -> list[str]:
         if not langs:
             raise McpError(
                 ErrorData(
-                    INTERNAL_ERROR,
-                    "No supported languages found. Please check Tesseract installation."
+                    code=INTERNAL_ERROR,
+                    message="No supported languages found. Please check Tesseract installation."
                 )
             )
         return langs
     except Exception as e:
         raise McpError(
             ErrorData(
-                INTERNAL_ERROR,
-                f"Failed to get supported languages: {str(e)}"
+                code=INTERNAL_ERROR,
+                message=f"Failed to get supported languages: {str(e)}"
             )
         )
 
