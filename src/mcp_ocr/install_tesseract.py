@@ -34,16 +34,16 @@ def install_tesseract():
     
     try:
         if system == "darwin" and pkg_manager == "brew":
-            subprocess.run(["brew", "install", "tesseract", "tesseract-lang"], check=True)
+            subprocess.run(["brew", "install", "tesseract", "tesseract-lang", "poppler"], check=True)
             
         elif system == "linux":
             if pkg_manager == "apt":
                 subprocess.run(["sudo", "apt-get", "update"], check=True)
-                subprocess.run(["sudo", "apt-get", "install", "-y", "tesseract-ocr", "tesseract-ocr-chi-sim", "tesseract-ocr-chi-tra"], check=True)
+                subprocess.run(["sudo", "apt-get", "install", "-y", "tesseract-ocr", "tesseract-ocr-chi-sim", "tesseract-ocr-chi-tra", "poppler-utils"], check=True)
             elif pkg_manager == "dnf":
-                subprocess.run(["sudo", "dnf", "install", "-y", "tesseract", "tesseract-langpack-chi_sim", "tesseract-langpack-chi_tra"], check=True)
+                subprocess.run(["sudo", "dnf", "install", "-y", "tesseract", "tesseract-langpack-chi_sim", "tesseract-langpack-chi_tra", "poppler-utils"], check=True)
             elif pkg_manager == "pacman":
-                subprocess.run(["sudo", "pacman", "-S", "--noconfirm", "tesseract", "tesseract-data-chi_sim", "tesseract-data-chi_tra"], check=True)
+                subprocess.run(["sudo", "pacman", "-S", "--noconfirm", "tesseract", "tesseract-data-chi_sim", "tesseract-data-chi_tra", "poppler"], check=True)
                 
         elif system == "windows":
             print("For Windows users:")
@@ -56,11 +56,11 @@ def install_tesseract():
     except subprocess.CalledProcessError as e:
         print(f"Error installing Tesseract: {str(e)}", file=sys.stderr)
         print("Please install Tesseract manually:", file=sys.stderr)
-        print("- macOS: brew install tesseract tesseract-lang", file=sys.stderr)
-        print("- Ubuntu/Debian: sudo apt-get install tesseract-ocr tesseract-ocr-chi-sim tesseract-ocr-chi-tra", file=sys.stderr)
-        print("- Fedora: sudo dnf install tesseract tesseract-langpack-chi_sim tesseract-langpack-chi_tra", file=sys.stderr)
-        print("- Arch: sudo pacman -S tesseract tesseract-data-chi_sim tesseract-data-chi_tra", file=sys.stderr)
-        print("- Windows: https://github.com/UB-Mannheim/tesseract/wiki", file=sys.stderr)
+        print("- macOS: brew install tesseract tesseract-lang poppler", file=sys.stderr)
+        print("- Ubuntu/Debian: sudo apt-get install tesseract-ocr tesseract-ocr-chi-sim tesseract-ocr-chi-tra poppler-utils", file=sys.stderr)
+        print("- Fedora: sudo dnf install tesseract tesseract-langpack-chi_sim tesseract-langpack-chi_tra poppler-utils", file=sys.stderr)
+        print("- Arch: sudo pacman -S tesseract tesseract-data-chi_sim tesseract-data-chi_tra poppler", file=sys.stderr)
+        print("- Windows: https://github.com/UB-Mannheim/tesseract/wiki and https://github.com/oschwartz10612/poppler-windows/releases", file=sys.stderr)
         sys.exit(1)
 
 if __name__ == "__main__":
