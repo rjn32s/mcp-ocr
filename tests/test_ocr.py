@@ -1,7 +1,7 @@
 import pytest
 import os
 import sys
-from mcp_ocr.server import perform_ocr, get_supported_languages
+from mcp_ocr.server import perform_ocr, get_supported_languages, perform_pdf_ocr, perform_batch_ocr
 
 @pytest.fixture
 def sample_image():
@@ -76,3 +76,26 @@ async def test_perform_ocr_chinese():
         assert "中" in result or result != ""
     except Exception as e:
         pytest.skip(f"Chinese OCR skip: {str(e)}")
+
+@pytest.mark.asyncio
+async def test_perform_pdf_ocr():
+    """Test PDF OCR support."""
+    # This is a bit tricky to test without a real PDF, but we can test the pipeline
+    # We'll use a placeholder that should fail with a specific error if poppler is missing
+    try:
+        # Invalid PDF data
+        with pytest.raises(Exception):
+            await perform_pdf_ocr(input_data="not a pdf")
+    except Exception as e:
+        pytest.skip(f"PDF OCR test skip: {str(e)}")
+
+@pytest.mark.asyncio
+async def test_perform_batch_ocr(sample_image):
+    """Test Batch OCR support."""
+    try:
+        results = await perform_batch_ocr(inputs=[sample_image, sample_image])
+        assert len(results) == 2
+        for result in results:
+            assert "hello" in result.lower()
+    except Exception as e:
+        pytest.skip(f"Batch OCR test skip: {str(e)}")

@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.1.4] - 2026-01-18
+
+### Added
+- PDF OCR Support: New `perform_pdf_ocr` tool to extract text from multi-page PDFs using `pdf2image`.
+- Batch Processing: New `perform_batch_ocr` tool to process multiple images in parallel using `asyncio.gather`.
+- Poppler Support: Installation script updated to handle `poppler-utils` dependency for PDF processing.
  
 ## [0.1.3] - 2026-01-18
 
