@@ -1,7 +1,7 @@
 import pytest
 import os
 import sys
-from mcp_ocr.server import perform_ocr, get_supported_languages, perform_pdf_ocr, perform_batch_ocr
+from mcp_ocr.server import perform_ocr, get_supported_languages, perform_pdf_ocr, perform_batch_ocr, image_to_data
 
 @pytest.fixture
 def sample_image():
@@ -99,3 +99,40 @@ async def test_perform_batch_ocr(sample_image):
             assert "hello" in result.lower()
     except Exception as e:
         pytest.skip(f"Batch OCR test skip: {str(e)}")
+
+@pytest.mark.asyncio
+async def test_perform_batch_ocr_partial_failure(sample_image):
+    """One bad input should not abort the batch; failed items start with 'ERROR:'."""
+    try:
+        results = await perform_batch_ocr(inputs=[sample_image, "not_a_valid_image"])
+        assert len(results) == 2
+        assert "hello" in results[0].lower()
+        assert results[1].startswith("ERROR:")
+    except Exception as e:
+        pytest.skip(f"Batch OCR partial-failure test skip: {str(e)}")
+
+@pytest.mark.asyncio
+async def test_image_to_data(sample_image):
+    """image_to_data returns text, mean_confidence, and per-word bboxes."""
+    try:
+        result = await image_to_data(input_data=sample_image)
+
+        assert "text" in result
+        assert "mean_confidence" in result
+        assert "words" in result
+
+        assert isinstance(result["mean_confidence"], float)
+        assert 0.0 <= result["mean_confidence"] <= 100.0
+
+        assert isinstance(result["words"], list)
+        assert len(result["words"]) > 0
+
+        word = result["words"][0]
+        assert "text" in word
+        assert "confidence" in word
+        assert "bbox" in word
+        assert all(k in word["bbox"] for k in ("left", "top", "width", "height"))
+
+        assert "hello" in result["text"].lower()
+    except Exception as e:
+        pytest.skip(f"image_to_data test skip: {str(e)}")

@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-06-08
+
+### Added
+- `image_to_data` tool: returns `{text, mean_confidence, words: [{text, confidence, bbox}]}` using `pytesseract.image_to_data`. Lets calling agents gate on confidence, do layout-aware extraction, and detect low-quality OCR results without a second call.
+
+### Fixed
+- `perform_ocr`: blocking `pytesseract.image_to_string` subprocess is now run via `asyncio.to_thread`, so concurrent calls in `perform_batch_ocr` execute in separate threads rather than serializing on the event loop.
+- `perform_batch_ocr`: added `return_exceptions=True` to `asyncio.gather`; failed images are returned as `"ERROR: <message>"` rather than aborting the entire batch.
+
 ## [0.1.4] - 2026-01-18
 
 ### Added

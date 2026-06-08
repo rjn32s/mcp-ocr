@@ -155,8 +155,11 @@ async def perform_ocr(
         img = await load_image(input_data)
         
         try:
-            # Perform OCR
-            text = pytesseract.image_to_string(img, lang=language, config=config)
+            # Perform OCR — run blocking subprocess in a thread so asyncio.gather
+            # in perform_batch_ocr gets real concurrency across multiple images.
+            text = await asyncio.to_thread(
+                pytesseract.image_to_string, img, lang=language, config=config
+            )
             if not text.strip():
                 raise McpError(
                     ErrorData(
@@ -165,6 +168,8 @@ async def perform_ocr(
                     )
                 )
             return text.strip()
+        except McpError:
+            raise
         except Exception as e:
             raise McpError(
                 ErrorData(
@@ -182,6 +187,97 @@ async def perform_ocr(
                 message=f"Unexpected error during OCR: {str(e)}"
             )
         )
+
+@mcp.tool()
+async def image_to_data(
+    input_data: str,
+    language: str = "eng",
+    config: str = "--oem 3 --psm 6"
+) -> dict[str, Any]:
+    """Perform OCR and return structured data including per-word confidence scores and bounding boxes.
+
+    Use this instead of perform_ocr when you need to:
+    - Gate on confidence (e.g. retry with a different --psm if mean_confidence < 60)
+    - Do layout-aware extraction (key-value pairs, tables, redaction)
+
+    Args:
+        input_data: File path, URL, or base64 encoded image data
+        language: Tesseract language code (default: "eng")
+        config: Tesseract configuration options (default: "--oem 3 --psm 6")
+
+    Returns:
+        Dict with:
+          text          — full extracted text (words joined by spaces)
+          mean_confidence — average confidence (0–100) across detected words; 0 if no words found
+          words         — list of {text, confidence, bbox: {left, top, width, height}}
+    """
+    try:
+        available_langs = pytesseract.get_languages()
+        if language not in available_langs:
+            raise McpError(
+                ErrorData(
+                    code=INVALID_PARAMS,
+                    message=f"Unsupported language: {language}. Available languages: {', '.join(available_langs)}"
+                )
+            )
+
+        img = await load_image(input_data)
+
+        try:
+            data = await asyncio.to_thread(
+                pytesseract.image_to_data,
+                img,
+                lang=language,
+                config=config,
+                output_type=pytesseract.Output.DICT,
+            )
+
+            words = []
+            for i in range(len(data["text"])):
+                conf = int(data["conf"][i])
+                word = data["text"][i]
+                if conf >= 0 and word.strip():
+                    words.append({
+                        "text": word,
+                        "confidence": float(conf),
+                        "bbox": {
+                            "left": int(data["left"][i]),
+                            "top": int(data["top"][i]),
+                            "width": int(data["width"][i]),
+                            "height": int(data["height"][i]),
+                        },
+                    })
+
+            mean_confidence = (
+                round(sum(w["confidence"] for w in words) / len(words), 2)
+                if words else 0.0
+            )
+
+            return {
+                "text": " ".join(w["text"] for w in words),
+                "mean_confidence": mean_confidence,
+                "words": words,
+            }
+        except McpError:
+            raise
+        except Exception as e:
+            raise McpError(
+                ErrorData(
+                    code=INTERNAL_ERROR,
+                    message=f"OCR processing failed: {str(e)}"
+                )
+            )
+
+    except McpError:
+        raise
+    except Exception as e:
+        raise McpError(
+            ErrorData(
+                code=INTERNAL_ERROR,
+                message=f"Unexpected error during OCR: {str(e)}"
+            )
+        )
+
 
 @mcp.tool()
 async def get_supported_languages() -> list[str]:
@@ -308,21 +404,30 @@ async def perform_batch_ocr(
     language: str = "eng",
     config: str = "--oem 3 --psm 6"
 ) -> list[str]:
-    """Perform OCR on multiple images in parallel.
-    
+    """Perform OCR on multiple images concurrently.
+
+    Each Tesseract call runs in its own thread (via perform_ocr → asyncio.to_thread),
+    so images are processed in parallel rather than sequentially.
+
     Args:
         inputs: List of file paths, URLs, or base64 encoded image data strings
         language: Tesseract language code (default: "eng")
         config: Tesseract configuration options (default: "--oem 3 --psm 6")
-        
+
     Returns:
-        List of extracted text for each input in the same order
+        List of extracted text for each input in the same order.
+        Failed items are returned as "ERROR: <message>" rather than raising,
+        so one bad image does not abort the whole batch.
     """
-    tasks = []
-    for input_data in inputs:
-        tasks.append(perform_ocr(input_data=input_data, language=language, config=config))
-    
-    return await asyncio.gather(*tasks)
+    tasks = [
+        perform_ocr(input_data=inp, language=language, config=config)
+        for inp in inputs
+    ]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    return [
+        r if not isinstance(r, BaseException) else f"ERROR: {r}"
+        for r in results
+    ]
 
 if __name__ == "__main__":
     # Initialize and run the server
